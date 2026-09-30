@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-oXBrn438I5Fvb67Az7DTYINFLgDdNGlF0u+9AuusN6w=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-bE+yrSBMySV+Xi545kGONXU2u6z4tQhjdG2jJkQYB4o=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer"><title>Torpedo Communications</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/grapesjs@0.23.6/dist/css/grapes.min.css" integrity="sha384-ipHR7uZK8wuUZWD8zZ09XYemZDqShtJpYjZibAX8L1f5rAUb4W78/j43sKG32Ip4" crossorigin="anonymous">
@@ -119,10 +119,10 @@ let AUTH = ''; try { AUTH = sessionStorage.getItem('comms-auth') || ''; } catch 
 const login = () => new Promise(ok => { const d = $('login'); d.showModal(); $('lgForm').onsubmit = e => { e.preventDefault();
   AUTH = 'Basic ' + btoa(unescape(encodeURIComponent($('lgUser').value + ':' + $('lgPass').value)));
   try { sessionStorage.setItem('comms-auth', AUTH); } catch {} d.close(); ok(); }; });
-const call = async (body, retry = true) => {
+const call = async body => {
   if (!AUTH) await login();
   const r = await fetch(API, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Authorization: AUTH }, body: JSON.stringify(body) });
-  if (r.status === 401 && retry) { AUTH = ''; $('lgErr').textContent = 'Wrong user or password.'; return call(body, false); }
+  if (r.status === 401) { AUTH = ''; try { sessionStorage.removeItem('comms-auth'); } catch {} $('lgErr').textContent = 'Wrong user or password — try again.'; return call(body); }
   const t = await r.text(); let j; try { j = JSON.parse(t); } catch { throw new Error(`HTTP ${r.status}: ${t.slice(0, 300)}`); }
   if (!r.ok) throw new Error(j.message || `HTTP ${r.status}`); return j;
 };
