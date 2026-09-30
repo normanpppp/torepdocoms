@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-oXBrn438I5Fvb67Az7DTYINFLgDdNGlF0u+9AuusN6w=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer"><title>Torpedo Communications</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/grapesjs@0.23.6/dist/css/grapes.min.css" integrity="sha384-ipHR7uZK8wuUZWD8zZ09XYemZDqShtJpYjZibAX8L1f5rAUb4W78/j43sKG32Ip4" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+<script src="https://cdn.jsdelivr.net/npm/grapesjs@0.23.6/dist/grapes.min.js" integrity="sha384-G8xsNrgjo5FhH6KRYfNNqPQJIX+CqzulP/0k3U+DAYwXrjv4nQt9EdKRLLq/gqRd" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/grapesjs-mjml@1.0.8/dist/index.js" integrity="sha384-Hu3AC9+4h23WQ4NmDvVQ5C8C2H5K18m9NUdiDGZrAs5cjiLHzLbxbsvl+BwqXHHH" crossorigin="anonymous"></script>
+<style>
+:root{--b:#dfe3e8;--ink:#1d2330;--mut:#6b7280;--acc:#0b5fff;--bad:#b00020;--ok:#0a7d32;--bg:#f3f4f6;--nav:#0b1f3a}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;font:14px/1.4 system-ui,sans-serif;color:var(--ink);background:var(--bg);display:flex;flex-direction:column}
+header{display:flex;gap:10px;align-items:center;padding:8px 16px;background:var(--nav);color:#fff;flex-wrap:wrap}
+header b{font-size:16px;margin-right:auto}
+header select,header .btn{height:32px}
+.app{flex:1;display:grid;grid-template-columns:340px 1fr;min-height:0}
+@media(max-width:900px){.app{grid-template-columns:1fr}}
+aside{background:#fff;border-right:1px solid var(--b);display:flex;flex-direction:column;min-height:0}
+.form{padding:14px 16px;display:grid;gap:10px;overflow:auto;flex:1}
+.form label{display:grid;gap:3px;font-size:12px;color:var(--mut)}
+.actions{border-top:1px solid var(--b);padding:12px 16px;display:grid;gap:8px;background:#fafbfc}
+input,select,textarea{font:inherit;padding:6px 8px;border:1px solid var(--b);border-radius:6px;background:#fff;color:var(--ink);width:100%}
+textarea{font-family:ui-monospace,monospace;font-size:13px;resize:vertical}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chips label{display:flex;gap:5px;align-items:center;border:1px solid var(--b);border-radius:999px;padding:4px 10px;color:var(--ink);font-size:13px;cursor:pointer}
+.chips input{width:auto;margin:0}.chips label:has(input:checked){background:#e8efff;border-color:var(--acc)}
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.tabs{display:flex;gap:2px;padding:0 12px;background:#fff;border-bottom:1px solid var(--b)}
+.tabs button{border:0;background:none;padding:10px 16px;cursor:pointer;font:inherit;border-bottom:2px solid transparent;color:var(--ink)}
+.tabs button.on{border-color:var(--acc);font-weight:600}.tabs button.off{color:#b3b8c0}.tabs button.off::after{content:" (off)";font-size:11px}
+.pane{display:none;flex:1;min-height:0}.pane.on{display:flex}
+#p-Email{flex-direction:column}#gjs{flex:1;min-height:560px}
+.split{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px;min-height:0}@media(max-width:1100px){.split{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:6px;min-height:0}.col textarea{flex:1;min-height:260px}
+.pvwrap{background:#fff;border:1px solid var(--b);border-radius:8px;padding:12px;overflow:auto}
+.pvh{font-size:12px;color:var(--mut);margin-bottom:8px}
+.msg{display:flex;gap:10px}.av{width:36px;height:36px;border-radius:6px;background:var(--nav);color:#fff;display:grid;place-items:center;font-weight:700;flex:none}
+.bubble{white-space:pre-wrap;word-break:break-word}.tg .bubble{background:#effdde;border-radius:10px;padding:8px 10px;max-width:420px}
+.teams .bubble{border:1px solid var(--b);border-left:4px solid #5b5fc7;border-radius:6px;padding:10px 12px}
+.hint{font-size:12px;color:var(--mut)}
+.tb{display:flex;gap:4px;flex-wrap:wrap}
+.btn{padding:7px 12px;border-radius:6px;border:1px solid var(--b);background:#fff;cursor:pointer;font:inherit;color:var(--ink)}
+.tb .btn{padding:3px 9px;font-size:13px}
+.btn.p{background:var(--acc);color:#fff;border-color:var(--acc)}.btn.d{background:var(--bad);color:#fff;border-color:var(--bad)}
+.btn.ghost{background:transparent;color:#fff;border-color:#40557a}
+.btn:disabled{opacity:.5;cursor:wait}
+.bad{color:var(--bad)}.ok{color:var(--ok)}
+#tplName{font-size:12px;color:#aab6cc}#tplName.dirty::after{content:" • unsaved changes";color:#ffcc66}
+dialog{border:1px solid var(--b);border-radius:10px;padding:0}dialog::backdrop{background:#0006}
+#outDlg{width:min(1100px,95vw);max-height:90vh}#outDlg .head{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--b);position:sticky;top:0;background:#fff}
+#out{padding:12px 16px}
+/* GrapesJS in the page's light theme (its colours are CSS variables) */
+:root{--gjs-main-color:#fff;--gjs-primary-color:#fff;--gjs-secondary-color:#1d2330;--gjs-tertiary-color:#0b5fff;--gjs-quaternary-color:#0b5fff;
+--gjs-font-color:#1d2330;--gjs-font-color-active:#0b5fff;--gjs-main-dark-color:rgba(0,0,0,.06);--gjs-secondary-dark-color:rgba(0,0,0,.04);
+--gjs-main-light-color:rgba(0,0,0,.04);--gjs-secondary-light-color:#1d2330;--gjs-light-border:#dfe3e8;--gjs-arrow-color:#6b7280;--gjs-dark-text-shadow:none;--gjs-main-font:system-ui,sans-serif}
+.gjs-pn-btn{color:#4b5563}.gjs-pn-btn.gjs-pn-active{color:var(--acc);background:#e8efff;box-shadow:none}
+.gjs-pn-panel{border-color:var(--b)}.gjs-pn-views-container,.gjs-pn-views{border-left:1px solid var(--b)}
+.gjs-block{border:1px solid var(--b);border-radius:6px;box-shadow:none;width:calc(50% - 10px);min-height:80px}.gjs-block:hover{border-color:var(--acc);color:var(--acc)}
+.gjs-cv-canvas{background:#e9ecf1}
+</style></head><body>
+<header>
+  <b>Torpedo — Communications</b>
+  <span id="tplName"></span>
+  <select id="tpl" style="width:220px"><option value="">Templates…</option></select>
+  <button class="btn ghost" id="tplSave" title="Save changes to the loaded template">Save</button>
+  <button class="btn ghost" id="tplSaveAs">Save as…</button>
+  <button class="btn ghost" id="tplNew">New</button>
+  <button class="btn ghost" id="tplDel" title="Delete the loaded template for everyone">Delete</button>
+</header>
+<div class="app">
+<aside>
+  <div class="form">
+    <label>Title<input id="Title" placeholder="New games — week 39"></label>
+    <label>Audience<select id="Audience">
+      <option>Live Operators</option><option>Prospect Operators</option><option>Operators in Integration</option>
+      <option>Live Game Providers</option><option>Prospect Game Providers</option><option>All Game Providers</option><option>Specific Accounts</option></select></label>
+    <label id="specWrap" style="display:none">Account names (comma-separated)<input id="Specific"></label>
+    <label>Channels<div class="chips" id="Channels"><label><input type="checkbox" value="Email" checked>Email</label><label><input type="checkbox" value="Slack">Slack</label><label><input type="checkbox" value="Telegram">Telegram</label><label><input type="checkbox" value="Teams">Teams</label></div></label>
+    <label>Type<select id="Type"><option>General</option><option>Technical</option></select><span class="hint">Technical posts to the company's tech Slack channel when it has one.</span></label>
+    <label>From (email)<select id="From"></select></label>
+    <label>Email subject<input id="Subject" placeholder="Defaults to the title"></label>
+    <label>Main text (plain)<textarea id="Message" style="min-height:120px;font-family:inherit" placeholder="Hi {{Account}}, …"></textarea>
+      <span class="hint">Used for any channel left empty, as the email's plain-text part and in the Zoho note. <code>{{Account}}</code> = company name.</span></label>
+  </div>
+  <div class="actions">
+    <button class="btn" id="bPreview">Preview recipients</button>
+    <button class="btn p" id="bTest">Test send (to me only)</button>
+    <button class="btn d" id="bSend">Send to everyone…</button>
+    <span class="hint" id="status"></span>
+  </div>
+</aside>
+<main>
+  <div class="tabs" id="tabs"><button data-t="Email">Email</button><button data-t="Slack">Slack</button><button data-t="Telegram">Telegram</button><button data-t="Teams">Teams</button></div>
+  <div class="pane" id="p-Email"><div id="gjs"></div></div>
+  <div class="pane" id="p-Slack"><div class="split">
+    <div class="col"><div class="tb" data-for="Slack"></div><textarea id="Slack" placeholder="Empty = main text"></textarea><span class="hint">mrkdwn: *bold* _italic_ ~strike~ `code` &lt;https://url|label&gt; &gt; quote</span></div>
+    <div class="pvwrap"><div class="pvh">Preview</div><div class="msg"><div class="av">T</div><div><b>Torpedo</b><div class="bubble" id="pvSlack"></div></div></div></div></div></div>
+  <div class="pane" id="p-Telegram"><div class="split">
+    <div class="col"><div class="tb" data-for="Telegram"></div><textarea id="Telegram" placeholder="Empty = main text"></textarea><span class="hint">Only &lt;b&gt; &lt;i&gt; &lt;u&gt; &lt;s&gt; &lt;a&gt; &lt;code&gt; &lt;pre&gt; &lt;blockquote&gt; &lt;tg-spoiler&gt;. Max 4096 characters.</span></div>
+    <div class="pvwrap tg"><div class="pvh">Preview</div><div class="bubble" id="pvTelegram"></div></div></div></div>
+  <div class="pane" id="p-Teams"><div class="split">
+    <div class="col"><div class="tb" data-for="TeamsText"></div><textarea id="TeamsText" style="min-height:140px" placeholder="Markdown, shown in a card under the title. Empty = main text"></textarea>
+      <textarea id="TeamsCard" style="min-height:140px" placeholder="Or paste a full Adaptive Card JSON (overrides the text above)"></textarea>
+      <span class="hint">Design a card at <a href="https://adaptivecards.io/designer/" target="_blank">adaptivecards.io/designer</a> and paste its JSON.</span></div>
+    <div class="pvwrap teams"><div class="pvh">Preview</div><div class="bubble" id="pvTeams"></div></div></div></div>
+</main>
+</div>
+<dialog id="outDlg"><div class="head"><b id="outTitle">Result</b><button class="btn" onclick="this.closest('dialog').close()">Close</button></div><div id="out"></div></dialog>
+<dialog id="login" style="padding:18px"><form id="lgForm" style="display:grid;gap:8px;min-width:260px">
+  <b>Log in</b><span class="bad" id="lgErr"></span>
+  <input id="lgUser" placeholder="User" autocomplete="username" required><input id="lgPass" type="password" placeholder="Password" autocomplete="current-password" required>
+  <button class="btn p">Log in</button></form></dialog>
+<script>
+const API = 'https://n8n-4shf.srv1997189.hstgr.cloud/webhook/comms'; // n8n answers only this site (CORS) and only with the login
+if (window.top !== window.self) document.documentElement.innerHTML = ''; // never run inside someone else's frame
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// ponytail: the page sends the login itself (browsers don't reliably reuse Basic Auth for fetch)
+let AUTH = ''; try { AUTH = sessionStorage.getItem('comms-auth') || ''; } catch {}
+const login = () => new Promise(ok => { const d = $('login'); d.showModal(); $('lgForm').onsubmit = e => { e.preventDefault();
+  AUTH = 'Basic ' + btoa(unescape(encodeURIComponent($('lgUser').value + ':' + $('lgPass').value)));
+  try { sessionStorage.setItem('comms-auth', AUTH); } catch {} d.close(); ok(); }; });
+const call = async (body, retry = true) => {
+  if (!AUTH) await login();
+  const r = await fetch(API, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Authorization: AUTH }, body: JSON.stringify(body) });
+  if (r.status === 401 && retry) { AUTH = ''; $('lgErr').textContent = 'Wrong user or password.'; return call(body, false); }
+  const t = await r.text(); let j; try { j = JSON.parse(t); } catch { throw new Error(`HTTP ${r.status}: ${t.slice(0, 300)}`); }
+  if (!r.ok) throw new Error(j.message || `HTTP ${r.status}`); return j;
+};
+const channels = () => [...$('Channels').querySelectorAll('input:checked')].map(i => i.value);
+
+// ---------- email editor ----------
+const STARTER = `<mjml><mj-body background-color="#f4f4f4">
+<mj-section background-color="#0b1f3a"><mj-column><mj-text color="#ffffff" font-size="20px" font-weight="bold">Torpedo</mj-text></mj-column></mj-section>
+<mj-section background-color="#ffffff"><mj-column>
+<mj-text font-size="15px">Hi {{Account}},</mj-text><mj-text font-size="15px">Write your message here.</mj-text>
+<mj-button background-color="#0b5fff" href="https://torpedo-ent.com">Read more</mj-button></mj-column></mj-section>
+<mj-section><mj-column><mj-text font-size="11px" color="#888888" align="center">Torpedo Entertainment</mj-text></mj-column></mj-section>
+</mj-body></mjml>`;
+const editor = grapesjs.init({
+  container: '#gjs', height: '100%', telemetry: false, cssIcons: '', /* icons loaded by the page */ plugins: ['grapesjs-mjml'], pluginsOpts: { 'grapesjs-mjml': { useCustomTheme: false } },
+  storageManager: { type: 'local', autosave: true, stepsBeforeSave: 1, options: { local: { key: 'torpedo-comms-email' } } },
+  projectData: { pages: [{ component: STARTER }] },
+});
+// open the Blocks panel by default: that's where drag-and-drop starts
+editor.on('load', () => { const bt = editor.Panels.getButton('views', 'open-blocks'); bt && bt.set('active', true); });
+const mjml = () => editor.runCommand('mjml-code');
+const emailHtml = () => editor.runCommand('mjml-code-to-html').html;
+
+// ---------- tabs + live previews ----------
+const tabs = [...$('tabs').children];
+const show = t => { tabs.forEach(b => b.classList.toggle('on', b.dataset.t === t)); document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + t)); if (t === 'Email') editor.refresh(); };
+tabs.forEach(b => b.onclick = () => show(b.dataset.t));
+const ex = s => String(s).replace(/\{\{\s*Account\s*\}\}/g, 'Example Co');
+const slackToHtml = s => esc(s)
+  .replace(/```([\s\S]*?)```/g, '<pre>$1</pre>')
+  .replace(/&lt;(https?:[^|&]+)\|([^&]+?)&gt;/g, '<a href="$1">$2</a>')
+  .replace(/^&gt; ?(.*)$/gm, '<blockquote style="margin:0;border-left:3px solid #ccc;padding-left:8px">$1</blockquote>')
+  .replace(/(^|\W)\*(\S[^*\n]*?)\*(?=\W|$)/g, '$1<b>$2</b>')
+  .replace(/(^|\W)_(\S[^_\n]*?)_(?=\W|$)/g, '$1<i>$2</i>')
+  .replace(/(^|\W)~(\S[^~\n]*?)~(?=\W|$)/g, '$1<s>$2</s>')
+  .replace(/`([^`\n]+)`/g, '<code>$1</code>');
+const mdToHtml = s => esc(s)
+  .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|\W)_(\S.*?)_(?=\W|$)/g, '$1<i>$2</i>')
+  .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2">$1</a>').replace(/^[-*] (.*)$/gm, '• $1');
+function render() {
+  const msg = $('Message').value;
+  $('pvSlack').innerHTML = $('Slack').value.trim() ? slackToHtml(ex($('Slack').value)) : esc(ex(msg));
+  $('pvTelegram').innerHTML = $('Telegram').value.trim() ? ex($('Telegram').value) : esc(ex(msg));
+  const card = $('TeamsCard').value.trim();
+  if (card) { try { JSON.parse(card); $('pvTeams').innerHTML = '<span class="ok">Card JSON is valid.</span> Check its look in the designer.'; }
+              catch (e) { $('pvTeams').innerHTML = `<span class="bad">Card JSON does not parse: ${esc(e.message)}</span>`; } }
+  else $('pvTeams').innerHTML = `<b>${esc($('Title').value)}</b>\n` + mdToHtml(ex($('TeamsText').value.trim() || msg));
+  tabs.forEach(b => b.classList.toggle('off', !channels().includes(b.dataset.t)));
+}
+const TPL_FIELDS = ['Subject', 'Message', 'Slack', 'Telegram', 'TeamsText', 'TeamsCard'];
+TPL_FIELDS.forEach(id => $(id).addEventListener('input', () => { render(); dirty(true); }));
+$('Channels').onchange = render; $('Title').oninput = render;
+$('Audience').onchange = () => $('specWrap').style.display = $('Audience').value === 'Specific Accounts' ? '' : 'none';
+
+// ---------- formatting buttons ----------
+const TB = {
+  Slack: [['<b>B</b>','*|*'],['<i>I</i>','_|_'],['<s>S</s>','~|~'],['code','`|`'],['link','<https://|label>'],['quote','> |']],
+  Telegram: [['<b>B</b>','<b>|</b>'],['<i>I</i>','<i>|</i>'],['<u>U</u>','<u>|</u>'],['<s>S</s>','<s>|</s>'],['code','<code>|</code>'],['link','<a href="https://">|</a>'],['quote','<blockquote>|</blockquote>'],['spoiler','<tg-spoiler>|</tg-spoiler>']],
+  TeamsText: [['<b>B</b>','**|**'],['<i>I</i>','_|_'],['link','[|](https://)'],['list','- |']],
+};
+document.querySelectorAll('.tb').forEach(tb => {
+  tb.innerHTML = TB[tb.dataset.for].map(([l, w]) => `<button type="button" class="btn" data-w="${esc(w)}">${l}</button>`).join('');
+  tb.onclick = e => { const b = e.target.closest('button'); if (!b) return; const ta = $(tb.dataset.for);
+    const [pre, post] = b.dataset.w.split('|'); const a = ta.selectionStart, z = ta.selectionEnd;
+    ta.setRangeText(pre + ta.value.slice(a, z) + post, a, z, 'end'); ta.focus(); render(); dirty(true); };
+});
+
+// ---------- templates (shared, stored in n8n) ----------
+let templates = [], current = '', isDirty = false;
+function dirty(v) { isDirty = v; $('tplName').textContent = current ? `Template: ${current}` : (v ? 'Not saved as a template' : ''); $('tplName').classList.toggle('dirty', v && !!current); }
+let quiet = Date.now() + 2000; // editor fires 'update' after programmatic loads too
+const setEmail = m => { quiet = Date.now() + 1500; editor.setComponents(m); };
+editor.on('update', () => { if (Date.now() > quiet) dirty(true); });
+const fillTpl = () => { $('tpl').innerHTML = '<option value="">Templates…</option>' + templates.map(t => `<option ${t.name === current ? 'selected' : ''}>${esc(t.name)}</option>`).join(''); };
+const refreshTpl = async () => { try { templates = (await call({ action: 'init' })).templates; fillTpl(); } catch {} };
+$('tpl').onfocus = refreshTpl; // pick up templates colleagues saved since the page opened
+$('tpl').onchange = () => {
+  const t = templates.find(t => t.name === $('tpl').value); if (!t) return;
+  if (isDirty && !confirm(`Discard unsaved changes and load "${t.name}"?`)) { fillTpl(); return; }
+  TPL_FIELDS.forEach(k => $(k).value = t[k] ?? ''); setEmail(t.mjml || STARTER);
+  current = t.name; render(); dirty(false);
+};
+async function saveTpl(name) {
+  const tpl = { mjml: mjml() }; TPL_FIELDS.forEach(k => tpl[k] = $(k).value);
+  templates = (await call({ action: 'template_save', name, tpl })).templates; current = name; fillTpl(); dirty(false);
+  $('status').textContent = `Template "${name}" saved.`;
+}
+$('tplSave').onclick = () => current ? saveTpl(current) : $('tplSaveAs').onclick();
+$('tplSaveAs').onclick = () => { const n = prompt('Template name', current || ''); if (!n) return;
+  if (templates.some(t => t.name === n) && n !== current && !confirm(`"${n}" exists. Overwrite it for everyone?`)) return; saveTpl(n.trim()); };
+$('tplNew').onclick = () => { if (isDirty && !confirm('Discard unsaved changes?')) return;
+  TPL_FIELDS.forEach(k => $(k).value = ''); setEmail(STARTER); current = ''; fillTpl(); render(); dirty(false); };
+$('tplDel').onclick = async () => { if (!current || !confirm(`Delete template "${current}" for everyone?`)) return;
+  templates = (await call({ action: 'template_delete', name: current })).templates; current = ''; fillTpl(); dirty(isDirty); };
+
+// ---------- actions ----------
+const form = () => ({
+  Title: $('Title').value.trim(), Audience: $('Audience').value, 'Specific accounts': $('Specific').value, Type: $('Type').value,
+  Channels: channels(), From: $('From').value, 'Email subject': $('Subject').value.trim(), Message: $('Message').value,
+  'Email HTML': channels().includes('Email') ? emailHtml() : '', 'Slack mrkdwn': $('Slack').value,
+  'Telegram HTML': $('Telegram').value, 'Teams text (markdown)': $('TeamsText').value, 'Teams Adaptive Card JSON': $('TeamsCard').value,
+});
+const resultsHtml = r => `<p>${r.results.length} send(s): <b class="ok">${r.okCount} ok</b>${r.failCount ? `, <b class="bad">${r.failCount} failed</b>` : ''}</p><ul>` +
+  r.results.map(x => `<li>${esc(x.channel)} → ${esc(x.target)} (${esc(x.to)}): ${x.ok ? '<span class="ok">ok</span>' : '<span class="bad">failed — ' + esc(x.detail) + '</span>'}</li>`).join('') + '</ul>';
+async function run(action) {
+  const f = form(), miss = [!f.Title && 'Title', !f.Message.trim() && 'Main text', !f.Channels.length && 'a channel'].filter(Boolean);
+  if (miss.length) { $('status').innerHTML = `<span class="bad">Missing: ${miss.join(', ')}.</span>`; return; }
+  if (action === 'send') {
+    const p = await go('preview', f); if (!p || p.blockers.length) return;
+    const s = p.summary;
+    if (prompt(`Send "${f.Title}" to ${s.companies} companies (${s.email} email, ${s.slack} Slack, ${s.telegram} Telegram, ${s.teams} Teams)?\nA note is logged on each company in Zoho.\n\nType SEND to confirm.`) !== 'SEND') { $('status').textContent = 'Not sent.'; return; }
+  }
+  await go(action, f);
+}
+async function go(action, f) {
+  const btns = document.querySelectorAll('.actions .btn'); btns.forEach(b => b.disabled = true);
+  $('status').textContent = { preview: 'Reading Zoho…', test: 'Sending test…', send: 'Sending…' }[action];
+  try {
+    const r = await call({ action, form: f, confirm: action === 'send' ? 'SEND' : undefined });
+    let h = r.previewHtml || '';
+    if (r.results) h = resultsHtml(r) + (r.report ? `<pre class="hint">${esc(r.report)}</pre>` : '') + '<hr>' + h;
+    $('out').innerHTML = h; $('outTitle').textContent = r.results ? (action === 'test' ? 'Test result' : 'Sent') : 'Recipients';
+    $('outDlg').showModal();
+    $('status').textContent = r.blockers && r.blockers.length ? 'Fix the red items first.' : 'Done.';
+    return r;
+  } catch (e) { $('status').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+  finally { btns.forEach(b => b.disabled = false); }
+}
+$('bPreview').onclick = () => run('preview'); $('bTest').onclick = () => run('test'); $('bSend').onclick = () => run('send');
+
+// ---------- init ----------
+show('Email'); render(); dirty(false);
+call({ action: 'init' }).then(r => {
+  $('From').innerHTML = r.froms.map(x => `<option>${esc(x)}</option>`).join('');
+  templates = r.templates; fillTpl();
+}).catch(e => $('status').innerHTML = `<span class="bad">Cannot reach n8n: ${esc(e.message)}</span>`);
+</script></body></html>
