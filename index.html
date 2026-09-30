@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-bE+yrSBMySV+Xi545kGONXU2u6z4tQhjdG2jJkQYB4o=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-zrAdTjGSfMTIyG9NsR1Ho/4TKKV5JTSQV+l4SnCGoFs=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer"><title>Torpedo Communications</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/grapesjs@0.23.6/dist/css/grapes.min.css" integrity="sha384-ipHR7uZK8wuUZWD8zZ09XYemZDqShtJpYjZibAX8L1f5rAUb4W78/j43sKG32Ip4" crossorigin="anonymous">
@@ -104,7 +104,7 @@ dialog{border:1px solid var(--b);border-radius:10px;padding:0}dialog::backdrop{b
     <div class="pvwrap teams"><div class="pvh">Preview</div><div class="bubble" id="pvTeams"></div></div></div></div>
 </main>
 </div>
-<dialog id="outDlg"><div class="head"><b id="outTitle">Result</b><button class="btn" onclick="this.closest('dialog').close()">Close</button></div><div id="out"></div></dialog>
+<dialog id="outDlg"><div class="head"><b id="outTitle">Result</b><button class="btn" id="outClose">Close</button></div><div id="out"></div></dialog>
 <dialog id="login" style="padding:18px"><form id="lgForm" style="display:grid;gap:8px;min-width:260px">
   <b>Log in</b><span class="bad" id="lgErr"></span>
   <input id="lgUser" placeholder="User" autocomplete="username" required><input id="lgPass" type="password" placeholder="Password" autocomplete="current-password" required>
@@ -251,6 +251,7 @@ async function go(action, f) {
   } catch (e) { $('status').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
   finally { btns.forEach(b => b.disabled = false); }
 }
+$('outClose').onclick = () => $('outDlg').close(); // no inline handlers: the page's security policy blocks them
 $('bPreview').onclick = () => run('preview'); $('bTest').onclick = () => run('test'); $('bSend').onclick = () => run('send');
 
 // ---------- init ----------
