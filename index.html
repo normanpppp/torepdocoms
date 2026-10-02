@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MyCnmIgltESEBHbTzN7PMW8w33Fm2c0nyrwkCcnPv1Y=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-n/I0EFAmdDFUlkJOYBS2BkNkXrSZm7EpOOzHpdWvt04=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer"><title>Torpedo Communications</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/grapesjs@0.23.6/dist/css/grapes.min.css" integrity="sha384-ipHR7uZK8wuUZWD8zZ09XYemZDqShtJpYjZibAX8L1f5rAUb4W78/j43sKG32Ip4" crossorigin="anonymous">
@@ -138,13 +138,15 @@ const STARTER = `<mjml><mj-body background-color="#f4f4f4">
 </mj-body></mjml>`;
 const editor = grapesjs.init({
   container: '#gjs', height: '100%', telemetry: false, cssIcons: '', /* icons loaded by the page */ plugins: ['grapesjs-mjml'], pluginsOpts: { 'grapesjs-mjml': { useCustomTheme: false } },
-  storageManager: { type: 'local', autosave: true, stepsBeforeSave: 1, options: { local: { key: 'torpedo-comms-email' } } },
+  storageManager: false, // the page keeps the email itself (GrapesJS' own autosave missed the last edits)
   projectData: { pages: [{ component: STARTER }] },
 });
 // open the Blocks panel by default: that's where drag-and-drop starts
 editor.on('load', () => { const bt = editor.Panels.getButton('views', 'open-blocks'); bt && bt.set('active', true); });
-const mjml = () => editor.runCommand('mjml-code');
-const emailHtml = () => editor.runCommand('mjml-code-to-html').html;
+// text being typed in the canvas only reaches the model when editing stops: stop it before reading
+const syncEditor = () => { if (editor.getEditing()) editor.select(); };
+const mjml = () => { syncEditor(); return editor.runCommand('mjml-code'); };
+const emailHtml = () => { syncEditor(); return editor.runCommand('mjml-code-to-html').html; };
 
 // ---------- tabs + live previews ----------
 const tabs = [...$('tabs').children];
@@ -262,15 +264,22 @@ $('bPreview').onclick = () => run('preview'); $('bTest').onclick = () => run('te
 // Your work (every field + the email design) is kept in this browser on every change, so a refresh loses nothing.
 // Nothing is saved to the server automatically: templates change only through the buttons above.
 const DRAFT = 'torpedo-comms-draft', DRAFT_IDS = ['Title', 'Audience', 'Specific', 'Type', ...TPL_FIELDS];
-const saveDraft = () => { try { localStorage.setItem(DRAFT, JSON.stringify({ v: Object.fromEntries(DRAFT_IDS.map(i => [i, $(i).value])),
-  ch: channels(), from: $('From').value, current, dirty: isDirty })); } catch {} };
-let draftFrom = '';
+let draftReady = false; // don't overwrite the stored draft before it has been put back
+const saveDraft = (sync) => { if (!draftReady) return; try { localStorage.setItem(DRAFT, JSON.stringify({ v: Object.fromEntries(DRAFT_IDS.map(i => [i, $(i).value])),
+  ch: channels(), from: $('From').value, current, dirty: isDirty,
+  email: sync ? mjml() : editor.runCommand('mjml-code') })); } catch {} };
+let draftFrom = '', draftEmail = '';
 try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null'); if (d) {
   DRAFT_IDS.forEach(i => { if (d.v[i] !== undefined) $(i).value = d.v[i]; });
   $('Channels').querySelectorAll('input').forEach(c => c.checked = d.ch.includes(c.value));
-  current = d.current || ''; isDirty = !!d.dirty; draftFrom = d.from || ''; $('Audience').onchange(); } } catch {}
+  current = d.current || ''; isDirty = !!d.dirty; draftFrom = d.from || ''; $('Audience').onchange();
+  draftEmail = d.email || ''; } } catch {}
+editor.onReady(() => { if (draftEmail) setEmail(draftEmail); draftReady = true; });
+// ponytail: text still being typed in the canvas isn't in the model yet; warn instead of syncing mid-typing (that moves the cursor)
+window.addEventListener('beforeunload', e => { if (editor.getEditing()) e.preventDefault(); });
 document.addEventListener('input', saveDraft); document.addEventListener('change', saveDraft);
-editor.on('update', () => setTimeout(saveDraft)); window.addEventListener('pagehide', saveDraft);
+editor.on('update', () => setTimeout(saveDraft)); setInterval(saveDraft, 2000); // style edits don't always fire 'update'
+window.addEventListener('pagehide', () => saveDraft(true)); document.addEventListener('visibilitychange', () => document.hidden && saveDraft(true));
 
 // ---------- init ----------
 show('Email'); render(); dirty(isDirty);
