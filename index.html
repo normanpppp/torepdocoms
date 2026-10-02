@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-yPkjOSpUd2fU7DjPqPJlce2W4GxmJtxSzleDSxru4tg=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MyCnmIgltESEBHbTzN7PMW8w33Fm2c0nyrwkCcnPv1Y=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer"><title>Torpedo Communications</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/grapesjs@0.23.6/dist/css/grapes.min.css" integrity="sha384-ipHR7uZK8wuUZWD8zZ09XYemZDqShtJpYjZibAX8L1f5rAUb4W78/j43sKG32Ip4" crossorigin="anonymous">
@@ -44,7 +44,7 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .btn.ghost{background:transparent;color:#fff;border-color:#40557a}
 .btn:disabled{opacity:.5;cursor:wait}
 .bad{color:var(--bad)}.ok{color:var(--ok)}
-#tplName{font-size:12px;color:#aab6cc}#tplName.dirty::after{content:" • unsaved changes";color:#ffcc66}
+#tplName{font-size:12px;color:#aab6cc}
 dialog{border:1px solid var(--b);border-radius:10px;padding:0}dialog::backdrop{background:#0006}
 #outDlg{width:min(1100px,95vw);max-height:90vh}#outDlg .head{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--b);position:sticky;top:0;background:#fff}
 #out{padding:12px 16px}
@@ -61,10 +61,10 @@ dialog{border:1px solid var(--b);border-radius:10px;padding:0}dialog::backdrop{b
   <b>Torpedo — Communications</b>
   <span id="tplName"></span>
   <select id="tpl" style="width:220px"><option value="">Templates…</option></select>
-  <button class="btn ghost" id="tplSave" title="Save changes to the loaded template">Save</button>
-  <button class="btn ghost" id="tplSaveAs">Save as…</button>
-  <button class="btn ghost" id="tplNew">New</button>
-  <button class="btn ghost" id="tplDel" title="Delete the loaded template for everyone">Delete</button>
+  <button class="btn ghost" id="tplNew" title="Clear the work and start a new message">New message</button>
+  <button class="btn ghost" id="tplSave" title="Overwrite the template your work is based on, for everyone">Update template</button>
+  <button class="btn ghost" id="tplSaveAs">Save as new template</button>
+  <button class="btn ghost" id="tplDel" title="Delete the template your work is based on, for everyone">Delete template</button>
 </header>
 <div class="app">
 <aside>
@@ -191,32 +191,36 @@ document.querySelectorAll('.tb').forEach(tb => {
 });
 
 // ---------- templates (shared, stored in n8n) ----------
-let templates = [], current = '', isDirty = false;
-function dirty(v) { isDirty = v; $('tplName').textContent = current ? `Template: ${current}` : (v ? 'Not saved as a template' : ''); $('tplName').classList.toggle('dirty', v && !!current); }
+// A template is a starting point: choosing one copies it into your work (autosaved in this browser).
+// The shared template changes only through "Update template" / "Save as new template".
+let templates = [], current = '', isDirty = false;   // current = template the work is based on
+function dirty(v) { isDirty = v; $('tplName').textContent = current ? `Based on: ${current}` : 'New message'; }
 let quiet = Date.now() + 2000; // editor fires 'update' after programmatic loads too
 const setEmail = m => { quiet = Date.now() + 1500; editor.setComponents(m); };
 editor.on('update', () => { if (Date.now() > quiet) dirty(true); });
-const fillTpl = () => { $('tpl').innerHTML = '<option value="">Templates…</option>' + templates.map(t => `<option ${t.name === current ? 'selected' : ''}>${esc(t.name)}</option>`).join(''); };
+const fillTpl = () => { $('tpl').innerHTML = '<option value="">Start from template…</option>' + templates.map(t => `<option ${t.name === current ? 'selected' : ''}>${esc(t.name)}</option>`).join(''); };
 const refreshTpl = async () => { try { templates = (await call({ action: 'init' })).templates; fillTpl(); } catch {} };
 $('tpl').onfocus = refreshTpl; // pick up templates colleagues saved since the page opened
 $('tpl').onchange = () => {
   const t = templates.find(t => t.name === $('tpl').value); if (!t) return;
-  if (isDirty && !confirm(`Discard unsaved changes and load "${t.name}"?`)) { fillTpl(); return; }
+  if (isDirty && !confirm(`Replace your current work with a copy of "${t.name}"?`)) { fillTpl(); return; }
   TPL_FIELDS.forEach(k => $(k).value = t[k] ?? ''); setEmail(t.mjml || STARTER);
-  current = t.name; render(); dirty(false);
+  current = t.name; render(); dirty(false); saveDraft();
 };
 async function saveTpl(name) {
   const tpl = { mjml: mjml() }; TPL_FIELDS.forEach(k => tpl[k] = $(k).value);
   templates = (await call({ action: 'template_save', name, tpl })).templates; current = name; fillTpl(); dirty(false);
-  $('status').textContent = `Template "${name}" saved.`; saveDraft();
+  $('status').textContent = `Template "${name}" saved for the team.`; saveDraft();
 }
-$('tplSave').onclick = () => current ? saveTpl(current) : $('tplSaveAs').onclick();
-$('tplSaveAs').onclick = () => { const n = prompt('Template name', current || ''); if (!n) return;
-  if (templates.some(t => t.name === n) && n !== current && !confirm(`"${n}" exists. Overwrite it for everyone?`)) return; saveTpl(n.trim()); };
-$('tplNew').onclick = () => { if (isDirty && !confirm('Discard unsaved changes?')) return;
-  TPL_FIELDS.forEach(k => $(k).value = ''); setEmail(STARTER); current = ''; fillTpl(); render(); dirty(false); };
-$('tplDel').onclick = async () => { if (!current || !confirm(`Delete template "${current}" for everyone?`)) return;
-  templates = (await call({ action: 'template_delete', name: current })).templates; current = ''; fillTpl(); dirty(isDirty); };
+$('tplSave').onclick = () => { if (!current) return $('tplSaveAs').onclick();
+  if (confirm(`Update the template "${current}" for everyone with your current work?`)) saveTpl(current); };
+$('tplSaveAs').onclick = () => { const n = (prompt('Name of the new template') || '').trim(); if (!n) return;
+  if (templates.some(t => t.name === n) && !confirm(`A template "${n}" already exists. Replace it for everyone?`)) return; saveTpl(n); };
+$('tplNew').onclick = () => { if (isDirty && !confirm('Clear your current work and start a new message?')) return;
+  TPL_FIELDS.forEach(k => $(k).value = ''); setEmail(STARTER); current = ''; fillTpl(); render(); dirty(false); saveDraft(); };
+$('tplDel').onclick = async () => { if (!current) return alert('Choose the template to delete in the list first.');
+  if (!confirm(`Delete the template "${current}" for everyone? Your current work stays.`)) return;
+  templates = (await call({ action: 'template_delete', name: current })).templates; current = ''; fillTpl(); dirty(isDirty); saveDraft(); };
 
 // ---------- actions ----------
 const form = () => ({
@@ -255,24 +259,21 @@ $('outClose').onclick = () => $('outDlg').close(); // no inline handlers: the pa
 $('bPreview').onclick = () => run('preview'); $('bTest').onclick = () => run('test'); $('bSend').onclick = () => run('send');
 
 // ---------- autosave ----------
-// 1) the whole page is kept in this browser on every change, so a refresh loses nothing
-// 2) a loaded template is saved to n8n 3 s after the last change (shared with the team)
+// Your work (every field + the email design) is kept in this browser on every change, so a refresh loses nothing.
+// Nothing is saved to the server automatically: templates change only through the buttons above.
 const DRAFT = 'torpedo-comms-draft', DRAFT_IDS = ['Title', 'Audience', 'Specific', 'Type', ...TPL_FIELDS];
 const saveDraft = () => { try { localStorage.setItem(DRAFT, JSON.stringify({ v: Object.fromEntries(DRAFT_IDS.map(i => [i, $(i).value])),
-  ch: channels(), from: $('From').value, current })); } catch {} };
+  ch: channels(), from: $('From').value, current, dirty: isDirty })); } catch {} };
 let draftFrom = '';
 try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null'); if (d) {
   DRAFT_IDS.forEach(i => { if (d.v[i] !== undefined) $(i).value = d.v[i]; });
   $('Channels').querySelectorAll('input').forEach(c => c.checked = d.ch.includes(c.value));
-  current = d.current || ''; draftFrom = d.from || ''; $('Audience').onchange(); } } catch {}
-let autoT;
-const autosave = () => { saveDraft(); clearTimeout(autoT);
-  if (current && isDirty) { $('status').textContent = 'Unsaved changes…'; autoT = setTimeout(() => saveTpl(current).then(() => $('status').textContent = `Auto-saved "${current}".`).catch(e => $('status').innerHTML = `<span class="bad">Auto-save failed: ${esc(e.message)}</span>`), 3000); } };
-document.addEventListener('input', autosave); document.addEventListener('change', autosave); editor.on('update', () => setTimeout(autosave));
-window.addEventListener('beforeunload', e => { saveDraft(); if (current && isDirty) e.preventDefault(); });
+  current = d.current || ''; isDirty = !!d.dirty; draftFrom = d.from || ''; $('Audience').onchange(); } } catch {}
+document.addEventListener('input', saveDraft); document.addEventListener('change', saveDraft);
+editor.on('update', () => setTimeout(saveDraft)); window.addEventListener('pagehide', saveDraft);
 
 // ---------- init ----------
-show('Email'); render(); dirty(false);
+show('Email'); render(); dirty(isDirty);
 call({ action: 'init' }).then(r => {
   $('From').innerHTML = r.froms.map(x => `<option>${esc(x)}</option>`).join('');
   if (r.froms.includes(draftFrom)) $('From').value = draftFrom;
