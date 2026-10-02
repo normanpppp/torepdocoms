@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-zrAdTjGSfMTIyG9NsR1Ho/4TKKV5JTSQV+l4SnCGoFs=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-yPkjOSpUd2fU7DjPqPJlce2W4GxmJtxSzleDSxru4tg=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer"><title>Torpedo Communications</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/grapesjs@0.23.6/dist/css/grapes.min.css" integrity="sha384-ipHR7uZK8wuUZWD8zZ09XYemZDqShtJpYjZibAX8L1f5rAUb4W78/j43sKG32Ip4" crossorigin="anonymous">
@@ -208,7 +208,7 @@ $('tpl').onchange = () => {
 async function saveTpl(name) {
   const tpl = { mjml: mjml() }; TPL_FIELDS.forEach(k => tpl[k] = $(k).value);
   templates = (await call({ action: 'template_save', name, tpl })).templates; current = name; fillTpl(); dirty(false);
-  $('status').textContent = `Template "${name}" saved.`;
+  $('status').textContent = `Template "${name}" saved.`; saveDraft();
 }
 $('tplSave').onclick = () => current ? saveTpl(current) : $('tplSaveAs').onclick();
 $('tplSaveAs').onclick = () => { const n = prompt('Template name', current || ''); if (!n) return;
@@ -254,10 +254,28 @@ async function go(action, f) {
 $('outClose').onclick = () => $('outDlg').close(); // no inline handlers: the page's security policy blocks them
 $('bPreview').onclick = () => run('preview'); $('bTest').onclick = () => run('test'); $('bSend').onclick = () => run('send');
 
+// ---------- autosave ----------
+// 1) the whole page is kept in this browser on every change, so a refresh loses nothing
+// 2) a loaded template is saved to n8n 3 s after the last change (shared with the team)
+const DRAFT = 'torpedo-comms-draft', DRAFT_IDS = ['Title', 'Audience', 'Specific', 'Type', ...TPL_FIELDS];
+const saveDraft = () => { try { localStorage.setItem(DRAFT, JSON.stringify({ v: Object.fromEntries(DRAFT_IDS.map(i => [i, $(i).value])),
+  ch: channels(), from: $('From').value, current })); } catch {} };
+let draftFrom = '';
+try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null'); if (d) {
+  DRAFT_IDS.forEach(i => { if (d.v[i] !== undefined) $(i).value = d.v[i]; });
+  $('Channels').querySelectorAll('input').forEach(c => c.checked = d.ch.includes(c.value));
+  current = d.current || ''; draftFrom = d.from || ''; $('Audience').onchange(); } } catch {}
+let autoT;
+const autosave = () => { saveDraft(); clearTimeout(autoT);
+  if (current && isDirty) { $('status').textContent = 'Unsaved changes…'; autoT = setTimeout(() => saveTpl(current).then(() => $('status').textContent = `Auto-saved "${current}".`).catch(e => $('status').innerHTML = `<span class="bad">Auto-save failed: ${esc(e.message)}</span>`), 3000); } };
+document.addEventListener('input', autosave); document.addEventListener('change', autosave); editor.on('update', () => setTimeout(autosave));
+window.addEventListener('beforeunload', e => { saveDraft(); if (current && isDirty) e.preventDefault(); });
+
 // ---------- init ----------
 show('Email'); render(); dirty(false);
 call({ action: 'init' }).then(r => {
   $('From').innerHTML = r.froms.map(x => `<option>${esc(x)}</option>`).join('');
+  if (r.froms.includes(draftFrom)) $('From').value = draftFrom;
   templates = r.templates; fillTpl();
 }).catch(e => $('status').innerHTML = `<span class="bad">Cannot reach n8n: ${esc(e.message)}</span>`);
 </script></body></html>
