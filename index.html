@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-n/I0EFAmdDFUlkJOYBS2BkNkXrSZm7EpOOzHpdWvt04=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ySzeMwA5EiBtzpJ88oyvfUmn7jCnllULbH5BlcPMlwc=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer"><title>Torpedo Communications</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/grapesjs@0.23.6/dist/css/grapes.min.css" integrity="sha384-ipHR7uZK8wuUZWD8zZ09XYemZDqShtJpYjZibAX8L1f5rAUb4W78/j43sKG32Ip4" crossorigin="anonymous">
@@ -140,7 +140,46 @@ const editor = grapesjs.init({
   container: '#gjs', height: '100%', telemetry: false, cssIcons: '', /* icons loaded by the page */ plugins: ['grapesjs-mjml'], pluginsOpts: { 'grapesjs-mjml': { useCustomTheme: false } },
   storageManager: false, // the page keeps the email itself (GrapesJS' own autosave missed the last edits)
   projectData: { pages: [{ component: STARTER }] },
+  // images are uploaded to n8n and used by link; never embedded (a 3 MB picture made templates 11 MB and broke saving,
+  // and Gmail/Outlook don't show embedded images anyway)
+  assetManager: { upload: 'n8n', embedAsBase64: false, autoAdd: false, uploadFile: e => uploadFiles(e) },
 });
+// ---------- images: hosted on n8n, referenced by URL ----------
+const IMG_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], IMG_MAX = 5e6, imgCache = {};
+async function uploadDataUrl(du) {
+  const key = du.length + du.slice(-64); if (imgCache[key]) return imgCache[key];
+  const m = /^data:(image\/[a-z]+);base64,(.*)$/s.exec(du); if (!m) throw new Error('Unreadable image.');
+  if (!IMG_TYPES.includes(m[1])) throw new Error('Images must be PNG, JPEG, GIF or WebP.');
+  if (m[2].length * 0.75 > IMG_MAX) throw new Error('Image is over 5 MB: make it smaller first.');
+  const r = await call({ action: 'image_upload', image: { type: m[1], data: m[2] } });
+  return (imgCache[key] = r.url);
+}
+const readAsDataUrl = f => new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(f); });
+async function uploadFiles(e) {
+  const files = [...((e.dataTransfer && e.dataTransfer.files) || (e.target && e.target.files) || [])];
+  for (const f of files) {
+    try { $('status').textContent = `Uploading ${f.name}…`; const url = await uploadDataUrl(await readAsDataUrl(f));
+      editor.AssetManager.add({ src: url, name: f.name }); $('status').textContent = `${f.name} uploaded: click it to use it.`; }
+    catch (err) { $('status').innerHTML = `<span class="bad">${esc(f.name)}: ${esc(err.message)}</span>`; }
+  }
+}
+// any image still embedded (pasted, dropped on the canvas, or in an older template) is uploaded and replaced by its link
+let externalizing = null;
+function externalizeImages() {
+  return externalizing || (externalizing = (async () => {
+    try {
+      const comps = editor.getWrapper().find('*');
+      for (const c of comps) for (const a of ['src', 'background-url']) {
+        const v = c.getAttributes()[a]; if (!v || !v.startsWith('data:')) continue;
+        $('status').textContent = 'Uploading images…';
+        const url = await uploadDataUrl(v); c.addAttributes({ [a]: url }); if (a === 'src') c.set('src', url);
+        dirty(true); $('status').textContent = 'Images uploaded.';
+      }
+    } catch (err) { $('status').innerHTML = `<span class="bad">Image: ${esc(err.message)}</span>`; throw err; }
+  })().finally(() => { externalizing = null; }));
+}
+let extT; editor.on('component:add component:update', () => { clearTimeout(extT); extT = setTimeout(() => externalizeImages().catch(() => {}), 800); });
+
 // open the Blocks panel by default: that's where drag-and-drop starts
 editor.on('load', () => { const bt = editor.Panels.getButton('views', 'open-blocks'); bt && bt.set('active', true); });
 // text being typed in the canvas only reaches the model when editing stops: stop it before reading
@@ -210,6 +249,7 @@ $('tpl').onchange = () => {
   current = t.name; render(); dirty(false); saveDraft();
 };
 async function saveTpl(name) {
+  await externalizeImages();
   const tpl = { mjml: mjml() }; TPL_FIELDS.forEach(k => tpl[k] = $(k).value);
   templates = (await call({ action: 'template_save', name, tpl })).templates; current = name; fillTpl(); dirty(false);
   $('status').textContent = `Template "${name}" saved for the team.`; saveDraft();
@@ -234,6 +274,7 @@ const form = () => ({
 const resultsHtml = r => `<p>${r.results.length} send(s): <b class="ok">${r.okCount} ok</b>${r.failCount ? `, <b class="bad">${r.failCount} failed</b>` : ''}</p><ul>` +
   r.results.map(x => `<li>${esc(x.channel)} → ${esc(x.target)} (${esc(x.to)}): ${x.ok ? '<span class="ok">ok</span>' : '<span class="bad">failed — ' + esc(x.detail) + '</span>'}</li>`).join('') + '</ul>';
 async function run(action) {
+  try { await externalizeImages(); } catch { return; }
   const f = form(), miss = [!f.Title && 'Title', !f.Message.trim() && 'Main text', !f.Channels.length && 'a channel'].filter(Boolean);
   if (miss.length) { $('status').innerHTML = `<span class="bad">Missing: ${miss.join(', ')}.</span>`; return; }
   if (action === 'send') {
@@ -267,7 +308,7 @@ const DRAFT = 'torpedo-comms-draft', DRAFT_IDS = ['Title', 'Audience', 'Specific
 let draftReady = false; // don't overwrite the stored draft before it has been put back
 const saveDraft = (sync) => { if (!draftReady) return; try { localStorage.setItem(DRAFT, JSON.stringify({ v: Object.fromEntries(DRAFT_IDS.map(i => [i, $(i).value])),
   ch: channels(), from: $('From').value, current, dirty: isDirty,
-  email: sync ? mjml() : editor.runCommand('mjml-code') })); } catch {} };
+  email: (e => e.length < 2e6 ? e : '')(sync ? mjml() : editor.runCommand('mjml-code')) })); } catch {} }; // never let a huge email stop the rest being kept
 let draftFrom = '', draftEmail = '';
 try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null'); if (d) {
   DRAFT_IDS.forEach(i => { if (d.v[i] !== undefined) $(i).value = d.v[i]; });
