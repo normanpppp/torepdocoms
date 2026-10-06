@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ySzeMwA5EiBtzpJ88oyvfUmn7jCnllULbH5BlcPMlwc=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JabJD4+onu1fMe377Dla1dHE3u2PK6w7CJpFRYt3hKA=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer"><title>Torpedo Communications</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/grapesjs@0.23.6/dist/css/grapes.min.css" integrity="sha384-ipHR7uZK8wuUZWD8zZ09XYemZDqShtJpYjZibAX8L1f5rAUb4W78/j43sKG32Ip4" crossorigin="anonymous">
@@ -11,7 +11,7 @@
 :root{--b:#dfe3e8;--ink:#1d2330;--mut:#6b7280;--acc:#0b5fff;--bad:#b00020;--ok:#0a7d32;--bg:#f3f4f6;--nav:#0b1f3a}
 *{box-sizing:border-box}html,body{height:100%}body{margin:0;font:14px/1.4 system-ui,sans-serif;color:var(--ink);background:var(--bg);display:flex;flex-direction:column}
 header{display:flex;gap:10px;align-items:center;padding:8px 16px;background:var(--nav);color:#fff;flex-wrap:wrap}
-header b{font-size:16px;margin-right:auto}
+header b{font-size:16px}
 header select,header .btn{height:32px}
 .app{flex:1;display:grid;grid-template-columns:340px 1fr;min-height:0}
 @media(max-width:900px){.app{grid-template-columns:1fr}}
@@ -56,16 +56,27 @@ dialog{border:1px solid var(--b);border-radius:10px;padding:0}dialog::backdrop{b
 .gjs-pn-panel{border-color:var(--b)}.gjs-pn-views-container,.gjs-pn-views{border-left:1px solid var(--b)}
 .gjs-block{border:1px solid var(--b);border-radius:6px;box-shadow:none;width:calc(50% - 10px);min-height:80px}.gjs-block:hover{border-color:var(--acc);color:var(--acc)}
 .gjs-cv-canvas{background:#e9ecf1}
+.ss{font-size:12px;color:#c9d3e3;margin-right:auto}.ss.ok{color:#9fe3b4}.ss.warn{color:#ffb547;font-weight:600}
+.hl{display:flex;gap:6px;align-items:center;font-size:12px;color:#aab6cc}.sep{width:1px;height:24px;background:#40557a}
+.banner{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:8px 16px;background:#fff7e0;border-bottom:1px solid #f0d58a}
+.banner.bad{background:#ffe9ec;border-color:#f3b3bd}.banner[hidden]{display:none}
+.btn.ghost:disabled{opacity:.4;cursor:default}
 </style></head><body>
 <header>
   <b>Torpedo — Communications</b>
+  <span id="saveState" class="ss">Loading…</span>
+  <label class="hl">My drafts <select id="drafts" style="width:240px"></select></label>
+  <button class="btn ghost" id="bNew" title="Start a new message (your current one stays in My drafts)">New message</button>
+  <button class="btn ghost" id="bDelDraft" title="Delete this draft for everyone">Delete draft</button>
+  <span class="sep"></span>
+  <select id="tpl" style="width:200px"><option value="">Start from template…</option></select>
   <span id="tplName"></span>
-  <select id="tpl" style="width:220px"><option value="">Templates…</option></select>
-  <button class="btn ghost" id="tplNew" title="Clear the work and start a new message">New message</button>
-  <button class="btn ghost" id="tplSave" title="Overwrite the template your work is based on, for everyone">Update template</button>
-  <button class="btn ghost" id="tplSaveAs">Save as new template</button>
-  <button class="btn ghost" id="tplDel" title="Delete the template your work is based on, for everyone">Delete template</button>
+  <button class="btn ghost" id="tplSave" title="Overwrite the template this message is based on, for everyone">Update template</button>
+  <button class="btn ghost" id="tplSaveAs">Save as template…</button>
+  <button class="btn ghost" id="tplDel" title="Delete the template this message is based on, for everyone">Delete template</button>
 </header>
+<div id="banner" class="banner" hidden><span></span><button class="btn" id="bannerX">OK</button></div>
+<div id="twin" class="banner bad" hidden><span>This draft is also open in another tab. Edit it in one tab only, or the other tab's changes will be kept as a separate copy.</span></div>
 <div class="app">
 <aside>
   <div class="form">
@@ -116,13 +127,19 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // ponytail: the page sends the login itself (browsers don't reliably reuse Basic Auth for fetch)
 let AUTH = ''; try { AUTH = sessionStorage.getItem('comms-auth') || ''; } catch {}
-const login = () => new Promise(ok => { const d = $('login'); d.showModal(); $('lgForm').onsubmit = e => { e.preventDefault();
-  AUTH = 'Basic ' + btoa(unescape(encodeURIComponent($('lgUser').value + ':' + $('lgPass').value)));
-  try { sessionStorage.setItem('comms-auth', AUTH); } catch {} d.close(); ok(); }; });
+let loginP = null; // one login box for every request waiting on it
+const login = () => loginP || (loginP = new Promise(ok => { const d = $('login'); d.showModal();
+  d.oncancel = e => e.preventDefault(); // Escape would leave every waiting save hanging
+  $('lgForm').onsubmit = e => { e.preventDefault();
+    AUTH = 'Basic ' + btoa(unescape(encodeURIComponent($('lgUser').value + ':' + $('lgPass').value)));
+    try { sessionStorage.setItem('comms-auth', AUTH); } catch {} d.close(); loginP = null; ok(); }; }));
 const call = async body => {
   if (!AUTH) await login();
-  const r = await fetch(API, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Authorization: AUTH }, body: JSON.stringify(body) });
-  if (r.status === 401) { AUTH = ''; try { sessionStorage.removeItem('comms-auth'); } catch {} $('lgErr').textContent = 'Wrong user or password — try again.'; return call(body); }
+  const used = AUTH;
+  const ac = new AbortController(), to = setTimeout(() => ac.abort(), 30000); // a stuck n8n counts as unreachable
+  let r; try { r = await fetch(API, { method: 'POST', credentials: 'omit', signal: ac.signal, headers: { 'Content-Type': 'application/json', Authorization: used }, body: JSON.stringify(body) }); }
+  catch (e) { throw new Error(e.name === 'AbortError' ? 'n8n did not answer in 30 s' : 'n8n cannot be reached'); } finally { clearTimeout(to); }
+  if (r.status === 401) { if (AUTH === used) { AUTH = ''; try { sessionStorage.removeItem('comms-auth'); } catch {} $('lgErr').textContent = 'Wrong user or password — try again.'; } return call(body); }
   const t = await r.text(); let j; try { j = JSON.parse(t); } catch { throw new Error(`HTTP ${r.status}: ${t.slice(0, 300)}`); }
   if (!r.ok) throw new Error(j.message || `HTTP ${r.status}`); return j;
 };
@@ -231,39 +248,261 @@ document.querySelectorAll('.tb').forEach(tb => {
     ta.setRangeText(pre + ta.value.slice(a, z) + post, a, z, 'end'); ta.focus(); render(); dirty(true); };
 });
 
-// ---------- templates (shared, stored in n8n) ----------
-// A template is a starting point: choosing one copies it into your work (autosaved in this browser).
-// The shared template changes only through "Update template" / "Save as new template".
-let templates = [], current = '', isDirty = false;   // current = template the work is based on
-function dirty(v) { isDirty = v; $('tplName').textContent = current ? `Based on: ${current}` : 'New message'; }
-let quiet = Date.now() + 2000; // editor fires 'update' after programmatic loads too
-const setEmail = m => { quiet = Date.now() + 1500; editor.setComponents(m); };
-editor.on('update', () => { if (Date.now() > quiet) dirty(true); });
-const fillTpl = () => { $('tpl').innerHTML = '<option value="">Start from template…</option>' + templates.map(t => `<option ${t.name === current ? 'selected' : ''}>${esc(t.name)}</option>`).join(''); };
-const refreshTpl = async () => { try { templates = (await call({ action: 'init' })).templates; fillTpl(); } catch {} };
-$('tpl').onfocus = refreshTpl; // pick up templates colleagues saved since the page opened
-$('tpl').onchange = () => {
-  const t = templates.find(t => t.name === $('tpl').value); if (!t) return;
-  if (isDirty && !confirm(`Replace your current work with a copy of "${t.name}"?`)) { fillTpl(); return; }
-  TPL_FIELDS.forEach(k => $(k).value = t[k] ?? ''); setEmail(t.mjml || STARTER);
-  current = t.name; render(); dirty(false); saveDraft();
+// ---------- saving: drafts + templates ----------
+// Every message you work on is a draft. It is kept in this browser on every change (so a refresh, a crash or a lost
+// connection never loses anything) and saved to n8n about a second later (so it is on every computer and the team sees it).
+// Each save carries the version it started from: if someone else saved in between, nothing is overwritten —
+// your version is kept as a separate copy. Templates are starting points, changed only through their buttons.
+const FIELD_IDS = ['Title', 'Audience', 'Specific', 'Type', 'Subject', 'Message', 'Slack', 'Telegram', 'TeamsText', 'TeamsCard'];
+const LS = 'comms:doc:', LS_LAST = 'comms:last', LS_TAB = 'comms:tab:', TAB_ALIVE = 90000; // hidden tabs only tick once a minute
+const newId = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+const TAB = newId();
+const ls = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+  keys(p) { try { return Object.keys(localStorage).filter(k => k.startsWith(p)); } catch { return []; } },
 };
-async function saveTpl(name) {
-  await externalizeImages();
-  const tpl = { mjml: mjml() }; TPL_FIELDS.forEach(k => tpl[k] = $(k).value);
-  templates = (await call({ action: 'template_save', name, tpl })).templates; current = name; fillTpl(); dirty(false);
-  $('status').textContent = `Template "${name}" saved for the team.`; saveDraft();
-}
-$('tplSave').onclick = () => { if (!current) return $('tplSaveAs').onclick();
-  if (confirm(`Update the template "${current}" for everyone with your current work?`)) saveTpl(current); };
-$('tplSaveAs').onclick = () => { const n = (prompt('Name of the new template') || '').trim(); if (!n) return;
-  if (templates.some(t => t.name === n) && !confirm(`A template "${n}" already exists. Replace it for everyone?`)) return; saveTpl(n); };
-$('tplNew').onclick = () => { if (isDirty && !confirm('Clear your current work and start a new message?')) return;
-  TPL_FIELDS.forEach(k => $(k).value = ''); setEmail(STARTER); current = ''; fillTpl(); render(); dirty(false); saveDraft(); };
-$('tplDel').onclick = async () => { if (!current) return alert('Choose the template to delete in the list first.');
-  if (!confirm(`Delete the template "${current}" for everyone? Your current work stays.`)) return;
-  templates = (await call({ action: 'template_delete', name: current })).templates; current = ''; fillTpl(); dirty(isDirty); saveDraft(); };
+let doc = null;            // the draft on screen: { id, rev, basedOn: {id, name, rev} | null }
+let lastJson = '';         // what is on screen (as saved data)
+let serverJson = '';       // what n8n has for this draft
+let wantFrom = '', ready = false, saveT = 0, retryN = 0, saving = null, saveErr = '';
+let lists = { drafts: [], templates: [] };
+// nothing can be typed while a draft is being put on screen (it would be overwritten)
+const freeze = on => { document.querySelector('.app').inert = on; ['drafts', 'bNew', 'bDelDraft', 'tpl', 'tplSaveAs', 'tplSave', 'tplDel'].forEach(i => $(i).disabled = on); if (!on) fillLists(); };
+const lock = on => { ready = !on; freeze(on); if (on) state('loading'); };
 
+// text being typed in the canvas only reaches the editor's model when typing stops: keep it on the side, by position
+const pathOf = c => { const p = []; while (c && c.parent()) { p.unshift(c.index()); c = c.parent(); } return p; };
+const atPath = p => p.reduce((c, i) => c && c.components().at(i), editor.getWrapper());
+const pendingText = () => { const c = editor.getEditing(); const el = c && c.view && c.view.getChildrenContainer();
+  return el ? { path: pathOf(c), html: el.innerHTML } : null; };
+const nameOf = d => (d.fields.Title || '').trim() || 'Untitled message';
+const copyOf = json => { const d = JSON.parse(json); d.fields.Title = nameOf(d) + ' (my copy)'; return d; };
+function snapshot() {
+  return { v: 2, fields: Object.fromEntries(FIELD_IDS.map(i => [i, $(i).value])), channels: channels(), from: $('From').value || wantFrom,
+    project: editor.getProjectData(), text: pendingText(), basedOn: doc.basedOn };
+}
+function applyData(d) {
+  if (!d.fields) d = { fields: d, mjml: d.mjml }; // templates saved before Oct 2026: fields at the top, email as MJML
+  FIELD_IDS.forEach(i => $(i).value = d.fields[i] ?? (i === 'Audience' ? 'Live Operators' : i === 'Type' ? 'General' : ''));
+  $('Channels').querySelectorAll('input').forEach(c => c.checked = (d.channels || ['Email']).includes(c.value));
+  wantFrom = d.from || ''; if ([...$('From').options].some(o => o.value === wantFrom)) $('From').value = wantFrom;
+  if (d.project) editor.loadProjectData(d.project); else editor.setComponents(d.mjml || STARTER);
+  if (d.text) { const c = atPath(d.text.path); if (c) c.components(d.text.html); }
+  $('Audience').onchange(); render();
+}
+function open(id, rev, data, { saved }) { // saved: n8n already has exactly this
+  lock(true); clearTimeout(saveT); saveT = 0; retryN = 0; saveErr = '';
+  doc = { id, rev, basedOn: data.basedOn || null }; applyData(data);
+  lastJson = JSON.stringify(snapshot()); serverJson = saved ? lastJson : '';
+  history.replaceState(null, '', '#d=' + id); writeLocal(); lock(false); fillLists(); state(); heartbeat();
+  if (!saved) scheduleSave(0);
+}
+// a new message (or a fresh copy of a template) isn't stored on n8n until you change something
+const openNew = (data = { fields: {}, project: null, mjml: STARTER }) => open(newId(), 0, data, { saved: true });
+
+// ---- this browser ----
+function writeLocal() {
+  const rec = { id: doc.id, rev: doc.rev, json: lastJson, synced: lastJson === serverJson, t: Date.now(), tab: TAB };
+  if (ls.set(LS + doc.id, rec)) return ls.set(LS_LAST, doc.id);
+  prune(); if (ls.set(LS + doc.id, rec)) return ls.set(LS_LAST, doc.id);
+  ls.del(LS + doc.id); // never leave an older copy behind that could later look newer than n8n's
+  if (!rec.synced) banner('This browser is out of storage space: your latest changes are only safe once it shows "All changes saved".', true);
+}
+function prune() { // drop copies of other drafts that n8n already has, oldest first
+  ls.keys(LS).map(k => [k, ls.get(k)]).filter(([k, r]) => !r || (r.synced && r.id !== (doc && doc.id)))
+    .sort((a, b) => ((a[1] || {}).t || 0) - ((b[1] || {}).t || 0)).forEach(([k]) => ls.del(k));
+}
+const liveTabs = () => ls.keys(LS_TAB).filter(k => k !== LS_TAB + TAB).map(k => ls.get(k)).filter(r => r && Date.now() - r.t < TAB_ALIVE);
+function heartbeat() {
+  if (!doc) return; ls.set(LS_TAB + TAB, { id: doc.id, t: Date.now() });
+  ls.keys(LS_TAB).forEach(k => { const r = ls.get(k); if (!r || Date.now() - r.t > 864e5) ls.del(k); });
+  $('twin').hidden = !liveTabs().some(r => r.id === doc.id);
+}
+setInterval(heartbeat, 5000);
+window.addEventListener('pagehide', () => { check(); ls.del(LS_TAB + TAB); });
+
+// ---- change detection: compares content, so no edit can be missed and opening something is never a change ----
+let checkT;
+function check() {
+  if (!ready || !doc) return; let s;
+  try { s = JSON.stringify(snapshot()); } catch { return; }
+  if (s !== lastJson) { lastJson = s; writeLocal(); }
+  if (lastJson !== serverJson) scheduleSave(); state();
+}
+const queueCheck = () => { clearTimeout(checkT); checkT = setTimeout(check, 250); };
+function dirty() { queueCheck(); } // called by the formatting buttons and image uploads
+document.addEventListener('input', queueCheck); document.addEventListener('change', queueCheck);
+editor.on('update component:update component:add component:remove style:property:update', queueCheck);
+editor.on('canvas:frame:load', ({ window: w }) => { w.document.addEventListener('input', queueCheck); w.document.addEventListener('keyup', queueCheck); });
+setInterval(check, 1500);
+document.addEventListener('visibilitychange', () => document.hidden && check());
+
+// ---- n8n ----
+function scheduleSave(ms = 1000) { // at most one save per second while typing; a pending (or back-off) save keeps its time
+  if (saveT || !ready) return; saveT = setTimeout(() => { saveT = 0; save(); }, ms); }
+async function save() {
+  if (saving) return saving;
+  if (!doc || !ready || lastJson === serverJson) return;
+  const json = lastJson, id = doc.id;
+  saving = (async () => {
+    state('saving');
+    try {
+      const r = await call({ action: 'doc_save', kind: 'draft', id, name: nameOf(JSON.parse(json)), baseRev: doc.rev, data: json });
+      if (doc.id !== id) return pushStrays(); // switched meanwhile: that draft's copy here is pushed in the background
+      if (r.conflict && r.doc.data !== json) return fork(r.doc);
+      doc.rev = r.doc.rev; serverJson = json; retryN = 0; saveErr = ''; writeLocal(); upsertMeta('drafts', r.doc);
+    } catch (e) {
+      if (doc.id !== id) return;
+      retryN++; saveErr = e.message; clearTimeout(saveT); saveT = 0; scheduleSave(Math.min(30000, 2000 * retryN));
+    }
+  })();
+  try { await saving; } finally { saving = null; state(); }
+  if (doc.id === id && lastJson !== serverJson && !retryN) scheduleSave(300);
+}
+async function flush() { // before leaving this draft: make sure the latest is in this browser, and on n8n if possible
+  freeze(true); check(); clearTimeout(saveT); saveT = 0; // nothing more can be typed from here on
+  if (saving) await saving;
+  for (let i = 0; i < 3 && doc && lastJson !== serverJson; i++) { await save(); if (retryN) break; }
+  lock(true); clearTimeout(saveT); saveT = 0; // nothing more for this draft; the next one takes over
+}
+function fork(theirs) { // someone else saved this draft meanwhile: keep theirs, keep what is on screen now as a new draft
+  check(); const d = copyOf(lastJson);
+  open(newId(), 0, d, { saved: false }); // written here before the old copy goes
+  ls.del(LS + theirs.id); upsertMeta('drafts', theirs);
+  banner(`Someone else saved this draft while you were editing it. Nothing was overwritten: your version is now "${d.fields.Title}", theirs is still in My drafts.`);
+}
+let pushing = null;
+const oneTabAtATime = fn => navigator.locks ? navigator.locks.request('comms-push', fn) : fn(); // two tabs never push the same copy
+const pushStrays = () => pushing || (pushing = oneTabAtATime(async () => { // copies here that never reached n8n (closed while offline, crash…)
+  for (const k of ls.keys(LS)) {
+    const r = ls.get(k); if (!r || r.synced || (doc && r.id === doc.id) || liveTabs().some(t => t.id === r.id)) continue;
+    try {
+      const res = await call({ action: 'doc_save', kind: 'draft', id: r.id, name: nameOf(JSON.parse(r.json)), baseRev: r.rev, data: r.json });
+      if (res.conflict && res.doc.data !== r.json) {
+        const id = newId(), d = copyOf(r.json), j = JSON.stringify(d);
+        const c = await call({ action: 'doc_save', kind: 'draft', id, name: d.fields.Title, baseRev: 0, data: j });
+        ls.set(LS + id, { id, rev: c.doc.rev, json: j, synced: true, t: Date.now() }); upsertMeta('drafts', c.doc);
+        const now = ls.get(k); if (now && now.json === r.json) ls.del(k); // unless it was opened and changed meanwhile
+      } else {
+        const now = ls.get(k); // it may have been opened and changed meanwhile: then only the version moves on
+        if (now) ls.set(k, now.json === r.json ? { ...now, rev: res.doc.rev, synced: true } : { ...now, rev: res.doc.rev });
+        if (doc && doc.id === r.id) doc.rev = res.doc.rev;
+        upsertMeta('drafts', res.doc);
+      }
+    } catch { break; }
+  }
+}).finally(() => { pushing = null; }));
+setInterval(() => ready && pushStrays(), 60000);
+async function openById(id) {
+  lock(true);
+  const local = ls.get(LS + id); let server = null, offline = false;
+  try { server = (await call({ action: 'doc_get', kind: 'draft', id })).doc; } catch { offline = true; }
+  if (local && !local.synced && server && server.data !== local.json) {
+    if (server.rev === local.rev) return open(id, server.rev, JSON.parse(local.json), { saved: false }); // your unsaved changes, on top of the saved draft
+    // both changed: keep both — yours goes to n8n as a copy before anything is removed here
+    const d = copyOf(local.json), cid = newId(), j = JSON.stringify(d);
+    try { const c = await call({ action: 'doc_save', kind: 'draft', id: cid, name: d.fields.Title, baseRev: 0, data: j }); upsertMeta('drafts', c.doc); ls.del(LS + id); }
+    catch { ls.set(LS + cid, { id: cid, rev: 0, json: j, synced: false, t: Date.now() }) && ls.del(LS + id); }
+    open(id, server.rev, JSON.parse(server.data), { saved: true });
+    return banner(`This draft was changed by someone else after your last edits here. Your edits are kept as "${d.fields.Title}" in My drafts.`);
+  }
+  if (server) return open(id, server.rev, JSON.parse(server.data), { saved: true });
+  if (local && offline) { open(id, local.rev, JSON.parse(local.json), { saved: local.synced });
+    return banner('n8n cannot be reached: showing the copy kept in this browser. Changes are saved as soon as n8n answers.'); }
+  if (local && !local.synced) return open(id, local.rev, JSON.parse(local.json), { saved: false }); // never reached n8n: send it now
+  if (local && local.rev === 0) return open(id, 0, JSON.parse(local.json), { saved: true }); // new, untouched message
+  if (local) { ls.del(LS + id); banner('That draft was deleted by someone. A new message was opened.'); }
+  openNew();
+}
+
+// ---- lists, templates ----
+const fmt = t => t ? new Date(t).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+function upsertMeta(kind, m) { const { data, ...meta } = m; lists[kind] = lists[kind].filter(x => x.id !== m.id).concat(meta); fillLists(); }
+function fillLists() {
+  const ds = [...lists.drafts].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  if (doc && !ds.some(d => d.id === doc.id)) ds.unshift({ id: doc.id, name: lastJson ? nameOf(JSON.parse(lastJson)) + (doc.rev ? '' : ' (new)') : 'New message' });
+  $('drafts').innerHTML = ds.map(d => `<option value="${esc(d.id)}" ${doc && d.id === doc.id ? 'selected' : ''}>${esc(d.name)}${d.updatedAt ? ' — ' + esc(fmt(d.updatedAt)) : ''}</option>`).join('');
+  const ts = [...lists.templates].sort((a, b) => a.name.localeCompare(b.name));
+  $('tpl').innerHTML = '<option value="">Start from template…</option>' + ts.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('');
+  const b = doc && doc.basedOn; $('tplName').textContent = b ? `Based on template: ${b.name}` : '';
+  $('tplSave').disabled = $('tplDel').disabled = !b || document.querySelector('.app').inert;
+}
+const refreshLists = async () => { try { const r = await call({ action: 'list' }); lists = { drafts: r.drafts, templates: r.templates }; fillLists(); } catch {} };
+function state(s) {
+  const el = $('saveState');
+  if (s === 'saving') { el.textContent = 'Saving…'; el.className = 'ss'; return; }
+  if (s === 'loading' || !doc) { el.textContent = 'Loading…'; el.className = 'ss'; return; }
+  if (lastJson === serverJson) { el.textContent = doc.rev ? 'All changes saved' : 'New message'; el.className = 'ss ok'; return; }
+  el.textContent = retryN ? `Not saved to n8n yet (${saveErr}) — kept in this browser, retrying…` : 'Unsaved changes…';
+  el.className = retryN ? 'ss warn' : 'ss';
+}
+function banner(msg, bad) { const b = $('banner'); b.querySelector('span').textContent = msg; b.className = bad ? 'banner bad' : 'banner'; b.hidden = false; }
+$('bannerX').onclick = () => $('banner').hidden = true;
+
+$('drafts').onfocus = refreshLists; $('tpl').onfocus = refreshLists;
+$('drafts').onchange = async () => { const id = $('drafts').value; if (id === doc.id) return; await flush(); await openById(id); };
+$('bNew').onclick = async () => { await flush(); openNew(); };
+$('bDelDraft').onclick = async () => {
+  if (!confirm(`Delete the draft "${nameOf(JSON.parse(lastJson))}" for everyone?`)) return;
+  const id = doc.id; lock(true); clearTimeout(saveT); saveT = 0; if (saving) await saving; // nothing is saved any more: it is being deleted
+  if (doc.id !== id) { lock(false); state(); return alert('Not deleted: someone else changed this draft meanwhile (your version is kept as a copy).'); }
+  try {
+    if (doc.rev) { const r = await call({ action: 'doc_delete', kind: 'draft', id, baseRev: doc.rev });
+      if (r.conflict) { alert('Not deleted: someone else saved this draft since you opened it. Their version is shown now.'); ls.del(LS + id); return openById(id); } }
+  } catch (e) { lock(false); state(); return alert('Not deleted: ' + e.message); }
+  ls.del(LS + id); lists.drafts = lists.drafts.filter(d => d.id !== id); openNew();
+};
+$('tpl').onchange = async () => {
+  const id = $('tpl').value; $('tpl').value = ''; if (!id) return;
+  let t; try { t = (await call({ action: 'doc_get', kind: 'template', id })).doc; } catch (e) { return alert('Could not open the template: ' + e.message); }
+  if (!t) return alert('That template no longer exists.');
+  await flush(); const back = doc.id;
+  try { const d = JSON.parse(t.data); d.basedOn = { id: t.id, name: t.name, rev: t.rev }; openNew(d); }
+  catch (e) { alert('That template cannot be opened: ' + e.message); await openById(back); }
+};
+async function saveTemplate(id, name, baseRev) {
+  const mine = doc; freeze(true);
+  try { await externalizeImages(); check(); if (doc !== mine) return;
+  const d = JSON.parse(lastJson); delete d.basedOn; d.text = null; syncEditor(); d.project = editor.getProjectData();
+  const r = await call({ action: 'doc_save', kind: 'template', id, name, baseRev, data: JSON.stringify(d) });
+  if (r.conflict) {
+    if (!confirm(`"${name}" was changed by someone else (${fmt(r.doc.updatedAt)}) since you opened it. Replace their version with yours?`)) return;
+    freeze(false); return saveTemplate(id, name, r.doc.rev);
+  }
+  upsertMeta('templates', r.doc); if (doc !== mine) return;
+  doc.basedOn = { id, name, rev: r.doc.rev }; check();
+  $('status').textContent = `Template "${name}" saved for the team.`;
+  } finally { if (doc === mine && ready) freeze(false); }
+}
+$('tplSave').onclick = () => { const b = doc.basedOn; if (!b) return;
+  if (confirm(`Update the template "${b.name}" for everyone with your current work?`)) saveTemplate(b.id, b.name, b.rev).catch(e => alert('Template not saved: ' + e.message)); };
+$('tplSaveAs').onclick = async () => {
+  const n = (prompt('Name of the new template') || '').trim().slice(0, 80); if (!n) return; await refreshLists();
+  const ex = lists.templates.find(t => t.name.toLowerCase() === n.toLowerCase());
+  if (ex && !confirm(`A template "${ex.name}" already exists. Replace it for everyone?`)) return;
+  saveTemplate(ex ? ex.id : newId(), ex ? ex.name : n, ex ? ex.rev : 0).catch(e => alert('Template not saved: ' + e.message));
+};
+$('tplDel').onclick = async () => { const b = doc.basedOn; if (!b) return;
+  if (!confirm(`Delete the template "${b.name}" for everyone? Your current work stays.`)) return;
+  const mine = doc; freeze(true);
+  try { const r = await call({ action: 'doc_delete', kind: 'template', id: b.id, baseRev: b.rev });
+    if (r.conflict) { freeze(false); return alert(`Not deleted: "${b.name}" was changed by someone else since you opened it.`); } }
+  catch (e) { freeze(false); return alert('Not deleted: ' + e.message); }
+  lists.templates = lists.templates.filter(t => t.id !== b.id); if (doc === mine) { doc.basedOn = null; check(); freeze(false); } };
+
+// ---------- init ----------
+show('Email'); render(); lock(true);
+editor.onReady(async () => {
+  let r = null;
+  try { r = await call({ action: 'init' }); } catch (e) { $('status').innerHTML = `<span class="bad">Cannot reach n8n: ${esc(e.message)}</span>`; }
+  if (r) { $('From').innerHTML = r.froms.map(x => `<option>${esc(x)}</option>`).join(''); lists = { drafts: r.drafts, templates: r.templates }; }
+  const hash = (location.hash.match(/d=([\w-]+)/) || [])[1], last = ls.get(LS_LAST);
+  const id = hash || (last && !liveTabs().some(t => t.id === last) ? last : null); // a new tab doesn't take over a draft open in another tab
+  if (id) await openById(id); else openNew();
+  pushStrays();
+});
 // ---------- actions ----------
 const form = () => ({
   Title: $('Title').value.trim(), Audience: $('Audience').value, 'Specific accounts': $('Specific').value, Type: $('Type').value,
@@ -301,32 +540,4 @@ async function go(action, f) {
 $('outClose').onclick = () => $('outDlg').close(); // no inline handlers: the page's security policy blocks them
 $('bPreview').onclick = () => run('preview'); $('bTest').onclick = () => run('test'); $('bSend').onclick = () => run('send');
 
-// ---------- autosave ----------
-// Your work (every field + the email design) is kept in this browser on every change, so a refresh loses nothing.
-// Nothing is saved to the server automatically: templates change only through the buttons above.
-const DRAFT = 'torpedo-comms-draft', DRAFT_IDS = ['Title', 'Audience', 'Specific', 'Type', ...TPL_FIELDS];
-let draftReady = false; // don't overwrite the stored draft before it has been put back
-const saveDraft = (sync) => { if (!draftReady) return; try { localStorage.setItem(DRAFT, JSON.stringify({ v: Object.fromEntries(DRAFT_IDS.map(i => [i, $(i).value])),
-  ch: channels(), from: $('From').value, current, dirty: isDirty,
-  email: (e => e.length < 2e6 ? e : '')(sync ? mjml() : editor.runCommand('mjml-code')) })); } catch {} }; // never let a huge email stop the rest being kept
-let draftFrom = '', draftEmail = '';
-try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null'); if (d) {
-  DRAFT_IDS.forEach(i => { if (d.v[i] !== undefined) $(i).value = d.v[i]; });
-  $('Channels').querySelectorAll('input').forEach(c => c.checked = d.ch.includes(c.value));
-  current = d.current || ''; isDirty = !!d.dirty; draftFrom = d.from || ''; $('Audience').onchange();
-  draftEmail = d.email || ''; } } catch {}
-editor.onReady(() => { if (draftEmail) setEmail(draftEmail); draftReady = true; });
-// ponytail: text still being typed in the canvas isn't in the model yet; warn instead of syncing mid-typing (that moves the cursor)
-window.addEventListener('beforeunload', e => { if (editor.getEditing()) e.preventDefault(); });
-document.addEventListener('input', saveDraft); document.addEventListener('change', saveDraft);
-editor.on('update', () => setTimeout(saveDraft)); setInterval(saveDraft, 2000); // style edits don't always fire 'update'
-window.addEventListener('pagehide', () => saveDraft(true)); document.addEventListener('visibilitychange', () => document.hidden && saveDraft(true));
-
-// ---------- init ----------
-show('Email'); render(); dirty(isDirty);
-call({ action: 'init' }).then(r => {
-  $('From').innerHTML = r.froms.map(x => `<option>${esc(x)}</option>`).join('');
-  if (r.froms.includes(draftFrom)) $('From').value = draftFrom;
-  templates = r.templates; fillTpl();
-}).catch(e => $('status').innerHTML = `<span class="bad">Cannot reach n8n: ${esc(e.message)}</span>`);
 </script></body></html>
