@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JabJD4+onu1fMe377Dla1dHE3u2PK6w7CJpFRYt3hKA=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nw8GQeQP6QqJUdVw8gHuncBi3bnOnqoAF/zJ6qP14Pw=' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src https: data: blob:; connect-src https://n8n-4shf.srv1997189.hstgr.cloud; frame-src 'self' blob: about:; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer"><title>Torpedo Communications</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/grapesjs@0.23.6/dist/css/grapes.min.css" integrity="sha384-ipHR7uZK8wuUZWD8zZ09XYemZDqShtJpYjZibAX8L1f5rAUb4W78/j43sKG32Ip4" crossorigin="anonymous">
@@ -162,21 +162,57 @@ const editor = grapesjs.init({
   assetManager: { upload: 'n8n', embedAsBase64: false, autoAdd: false, uploadFile: e => uploadFiles(e) },
 });
 // ---------- images: hosted on n8n, referenced by URL ----------
-const IMG_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], IMG_MAX = 5e6, imgCache = {};
-async function uploadDataUrl(du) {
+const IMG_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], IMG_MAX = 5e6, IMG_IN_MAX = 40e6, imgCache = {};
+const kb = n => n >= 1e6 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+const b64bytes = du => Math.floor((du.length - du.indexOf(',') - 1) * 3 / 4);
+// Shrinks a picture before upload, in the browser (canvas): at most 1200 px wide (emails show 600 px, x2 for sharp screens),
+// photos as JPEG ~0.82 quality, pictures with transparency stay PNG. GIFs are left as they are (could be animated).
+// Keeps the original whenever the shrunk version would not be smaller.
+const IMG_W = 1200, IMG_TARGET = 500 * 1024;
+async function shrinkImage(du) {
+  const mime = du.slice(5, du.indexOf(';')), before = b64bytes(du);
+  if (mime === 'image/gif') return { du, before, after: before };
+  // a picture the browser can't decode is sent as it is: n8n checks it is a real image and refuses it otherwise
+  const img = await new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = du; });
+  const w0 = img && img.naturalWidth, h0 = img && img.naturalHeight; if (!w0 || !h0) return { du, before, after: before };
+  if (w0 <= IMG_W && before <= IMG_TARGET) return { du, before, after: before };
+  const draw = w => { const c = document.createElement('canvas'); c.width = w; c.height = Math.max(1, Math.round(h0 * w / w0));
+    const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(img, 0, 0, c.width, c.height); return c; };
+  let c = draw(Math.min(IMG_W, w0));
+  let alpha = false;
+  if (mime !== 'image/jpeg') { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i] < 255) { alpha = true; break; } }
+  let out;
+  if (alpha) out = c.toDataURL('image/png');
+  else {
+    const flat = cv => { const f = document.createElement('canvas'); f.width = cv.width; f.height = cv.height; const x = f.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, f.width, f.height); x.drawImage(cv, 0, 0); return f; };
+    for (const [w, q] of [[Math.min(IMG_W, w0), 0.82], [Math.min(IMG_W, w0), 0.72], [Math.min(1000, w0), 0.72], [Math.min(800, w0), 0.7]]) {
+      if (w !== c.width) c = draw(w);
+      out = flat(c).toDataURL('image/jpeg', q); if (b64bytes(out) <= IMG_TARGET) break;
+    }
+  }
+  const after = b64bytes(out);
+  return after < before ? { du: out, before, after } : { du, before, after: before };
+}
+async function uploadDataUrl(du, label = 'Image') {
   const key = du.length + du.slice(-64); if (imgCache[key]) return imgCache[key];
-  const m = /^data:(image\/[a-z]+);base64,(.*)$/s.exec(du); if (!m) throw new Error('Unreadable image.');
+  const m = /^data:(image\/[a-z]+);base64,/.exec(du.slice(0, 40)); if (!m) throw new Error('Unreadable image.');
   if (!IMG_TYPES.includes(m[1])) throw new Error('Images must be PNG, JPEG, GIF or WebP.');
-  if (m[2].length * 0.75 > IMG_MAX) throw new Error('Image is over 5 MB: make it smaller first.');
-  const r = await call({ action: 'image_upload', image: { type: m[1], data: m[2] } });
-  return (imgCache[key] = r.url);
+  if (b64bytes(du) > IMG_IN_MAX) throw new Error('Image is over 40 MB: make it smaller first.');
+  const s = await shrinkImage(du);
+  if (s.after > IMG_MAX) throw new Error(`${s.du.startsWith('data:image/gif') ? 'GIF' : 'Image'} is ${kb(s.after)} (max 5 MB): make it smaller first.`);
+  if (s.after < s.before) $('status').textContent = `${label} ${kb(s.before)} → ${kb(s.after)}, uploading…`;
+  const t = s.du.slice(5, s.du.indexOf(';'));
+  const r = await call({ action: 'image_upload', image: { type: t, data: s.du.slice(s.du.indexOf(',') + 1) } });
+  imgCache[key] = { url: r.url, before: s.before, after: s.after };
+  return imgCache[key];
 }
 const readAsDataUrl = f => new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(f); });
 async function uploadFiles(e) {
   const files = [...((e.dataTransfer && e.dataTransfer.files) || (e.target && e.target.files) || [])];
   for (const f of files) {
-    try { $('status').textContent = `Uploading ${f.name}…`; const url = await uploadDataUrl(await readAsDataUrl(f));
-      editor.AssetManager.add({ src: url, name: f.name }); $('status').textContent = `${f.name} uploaded: click it to use it.`; }
+    try { $('status').textContent = `Uploading ${f.name}…`; const u = await uploadDataUrl(await readAsDataUrl(f), f.name);
+      editor.AssetManager.add({ src: u.url, name: f.name });
+      $('status').textContent = `${f.name}${u.after < u.before ? ` ${kb(u.before)} → ${kb(u.after)}` : ''} uploaded: click it to use it.`; }
     catch (err) { $('status').innerHTML = `<span class="bad">${esc(f.name)}: ${esc(err.message)}</span>`; }
   }
 }
@@ -189,8 +225,8 @@ function externalizeImages() {
       for (const c of comps) for (const a of ['src', 'background-url']) {
         const v = c.getAttributes()[a]; if (!v || !v.startsWith('data:')) continue;
         $('status').textContent = 'Uploading images…';
-        const url = await uploadDataUrl(v); c.addAttributes({ [a]: url }); if (a === 'src') c.set('src', url);
-        dirty(true); $('status').textContent = 'Images uploaded.';
+        const u = await uploadDataUrl(v); c.addAttributes({ [a]: u.url }); if (a === 'src') c.set('src', u.url);
+        dirty(true); $('status').textContent = `Images uploaded${u.after < u.before ? ` (${kb(u.before)} → ${kb(u.after)})` : ''}.`;
       }
     } catch (err) { $('status').innerHTML = `<span class="bad">Image: ${esc(err.message)}</span>`; throw err; }
   })().finally(() => { externalizing = null; }));
