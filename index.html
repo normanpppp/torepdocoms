@@ -160,6 +160,28 @@ const editor = grapesjs.init({
   // images are uploaded to n8n and used by link; never embedded (a 3 MB picture made templates 11 MB and broke saving,
   // and Gmail/Outlook don't show embedded images anyway)
   assetManager: { upload: 'n8n', embedAsBase64: false, autoAdd: false, uploadFile: e => uploadFiles(e) },
+  // the HTML parser drops <tr>/<td> outside a <table>: wrap mj-table rows on the way in (unwrapped again in toHTML below)
+  parser: { optionsHtml: { preParser: s => s.replace(/(<mj-table\b[^>]*>)(?!\s*<table)([\s\S]*?)(<\/mj-table>)/g, '$1<table>$2</table>$3') } },
+});
+// ---------- table block: grapesjs-mjml has none, MJML has <mj-table>; cells edit in place like a text block ----------
+const textToHTML = editor.Components.getType('mj-text').model.prototype.toHTML;
+editor.Components.addType('mj-table', {
+  extend: 'mj-text',
+  isComponent: el => el.tagName && el.tagName.toLowerCase() === 'mj-table',
+  model: {
+    defaults: { name: 'Table' },
+    toHTML(o) { return textToHTML.call(this, o).replace(/^(<mj-table[^>]*>)\s*<table>(?:<tbody>)?([\s\S]*?)(?:<\/tbody>)?<\/table>\s*(<\/mj-table>)$/, '$1$2$3'); },
+  },
+  view: { getChildrenSelector: () => 'td > table' },
+});
+const CELL = 'border:1px solid #d0d5dd;padding:10px 14px;text-align:center';
+editor.Blocks.add('mj-table', {
+  label: 'Table',
+  media: '<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 10h18M9 5v14M15 5v14"/></svg>',
+  content: `<mj-table align="center" font-size="14px" line-height="20px">
+<tr><th style="${CELL}">Start Date</th><th style="${CELL}">End Date</th><th style="${CELL}">Promotion Name</th></tr>
+<tr><td style="${CELL}">1 October 2026</td><td style="${CELL}">31 December 2026</td><td style="${CELL}">Boba Race</td></tr>
+</mj-table>`,
 });
 // ---------- images: hosted on n8n, referenced by URL ----------
 const IMG_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], IMG_MAX = 5e6, IMG_IN_MAX = 40e6, imgCache = {};
